@@ -648,6 +648,17 @@ jobs:
           head -30 ./KernelSU/kernel/kpm/kpm.h
           echo "=== compact.c ksu_manager_appid 残留检查 ==="
           grep -n "ksu_manager_appid\|ksu_last_manager_appid" ./KernelSU/kernel/kpm/compact.c | head -10
+          echo "=== 验证 SUKISU_KPM 常量真的在 patched supercall.h 里 ==="
+          grep -c "SUKISU_KPM\|ksu_kpm_cmd" ./KernelSU/uapi/supercall.h
+          echo "=== 验证 compact.c 中包含 supercall.h 的路径 ==="
+          grep -E "include.*supercall" ./KernelSU/kernel/kpm/kpm.h ./KernelSU/kernel/kpm/compact.c ./KernelSU/kernel/kpm/super_access.c 2>/dev/null | head -5
+          echo "=== 把 patched 文件存为诊断 artifact ==="
+          mkdir -p /tmp/diag_artifact
+          cp ./KernelSU/uapi/supercall.h /tmp/diag_artifact/supercall_patched.h
+          cp ./KernelSU/kernel/Kbuild /tmp/diag_artifact/Kbuild_patched
+          cp ./KernelSU/kernel/Kconfig /tmp/diag_artifact/Kconfig_patched
+          cp ./KernelSU/kernel/kpm/compact.c /tmp/diag_artifact/compact_patched.c 2>/dev/null
+          cp ./KernelSU/kernel/kpm/kpm.h /tmp/diag_artifact/kpm.h 2>/dev/null
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
@@ -805,7 +816,7 @@ jobs:
           ccache -s
 
       - name: 📤 Upload build log on failure (失败时上传 build log)
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: build_kernel_diag
