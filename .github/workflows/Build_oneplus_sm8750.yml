@@ -591,19 +591,6 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
 
-      - name: ✅ Verify CONFIG_KPM=y in gki_defconfig (验证 KPM 真的写进 defconfig)
-        run: |
-          cd kernel_workspace
-          # 必须 CONFIG_KPM=y 实际出现在 gki_defconfig，否则 KPM 不会编译进内核。
-          if grep -q "^CONFIG_KPM=y" ./common/arch/arm64/configs/gki_defconfig; then
-            echo "✓ CONFIG_KPM=y 已确认进入 gki_defconfig"
-            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig
-          else
-            echo "::error::CONFIG_KPM=y 未出现在 gki_defconfig，KPM 不会被编译进内核"
-            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig || echo "(no CONFIG_KPM line at all)"
-            exit 1
-          fi
-
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
@@ -643,6 +630,19 @@ jobs:
             echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
           else
             echo "未启用SUSFS 跳过SUSFS配置"
+          fi
+
+      - name: ✅ Verify CONFIG_KPM=y in gki_defconfig (验证 KPM 真的写进 defconfig)
+        run: |
+          cd kernel_workspace
+          # 必须 CONFIG_KPM=y 实际出现在 gki_defconfig，否则 KPM 不会编译进内核。
+          if grep -q "^CONFIG_KPM=y" ./common/arch/arm64/configs/gki_defconfig; then
+            echo "✓ CONFIG_KPM=y 已确认进入 gki_defconfig"
+            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig
+          else
+            echo "::error::CONFIG_KPM=y 未出现在 gki_defconfig，KPM 不会被编译进内核"
+            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig || echo "(no CONFIG_KPM line at all)"
+            exit 1
           fi
 
 
