@@ -626,7 +626,7 @@ jobs:
           if ! grep -q "^config KPM" ./KernelSU/kernel/Kconfig; then
             KPM_KCFG_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
             echo "$KPM_KCFG_B64" | base64 -d > /tmp/kpm_kconfig.snippet
-            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LY29uZmlnIgp3aXRoIG9wZW4ocCkgYXMgZjoKICAgIHQgPSBmLnJlYWQoKQptID0gImVuZG1lbnUiCmkgPSB0LnJmaW5kKG0pCmlmIGkgPCAwOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiS2NvbmZpZyBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKCIvdG1wL2twbV9rY29uZmlnLnNuaXBwZXQiKSBhcyBmOgogICAgcyA9IGYucmVhZCgpCndpdGggb3BlbihwLCAicyIpIGFzIGY6CiAgICBmLndyaXRlKHRbOmldICsgcyArIHRbaTpdKQpwcmludChmIktjb25maWcgcGF0Y2hlZCBhdCBvZmZzZXQge2l9IikK" | base64 -d > /tmp/patch_kconfig.py
+            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LY29uZmlnIgp3aXRoIG9wZW4ocCkgYXMgZjoKICAgIHQgPSBmLnJlYWQoKQptID0gImVuZG1lbnUiCmkgPSB0LnJmaW5kKG0pCmlmIGkgPCAwOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiS2NvbmZpZyBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKCIvdG1wL2twbV9rY29uZmlnLnNuaXBwZXQiKSBhcyBmOgogICAgcyA9IGYucmVhZCgpCndpdGggb3BlbihwLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKHRbOmldICsgcyArIHRbaTpdKQpwcmludChmIktjb25maWcgcGF0Y2hlZCBhdCBvZmZzZXQge2l9IikK" | base64 -d > /tmp/patch_kconfig.py
             python3 /tmp/patch_kconfig.py
             echo "✓ Kconfig 已加上 config KPM 选项"
           fi
