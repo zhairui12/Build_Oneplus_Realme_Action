@@ -597,38 +597,51 @@ jobs:
           # 1) Clone SukiSU-Ultra shallow to /tmp
           rm -rf /tmp/sukisu-ultra-src
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/sukisu-ultra-src
-          # 2) Sanity check that kernel/kpm/ exists
+          # 2) Sanity check
           if [ ! -d /tmp/sukisu-ultra-src/kernel/kpm ]; then
             echo "::error::SukiSU-Ultra 主仓库已没有 kernel/kpm/ 目录，移植失败"
             exit 1
           fi
-          ls -la /tmp/sukisu-ultra-src/kernel/kpm/
           # 3) Copy kpm/ files into ReSukiSU
           mkdir -p ./KernelSU/kernel/kpm
           cp /tmp/sukisu-ultra-src/kernel/kpm/*.c \
              /tmp/sukisu-ultra-src/kernel/kpm/*.h \
              ./KernelSU/kernel/kpm/
           echo "✓ kpm/ 目录已复制到 ReSukiSU"
-          # 4) Patch Kbuild: insert 3 obj-$(CONFIG_KPM) lines before "# Keep a new line"
+          # 4) Patch ReSukiSU uapi/supercall.h to add KPM constants + struct
+          KPM_B64='Ci8qIEtQTSBjb250cm9sIGNvZGVzIChiYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhKSAqLwpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fTE9BRCwgMSkKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1VOTE9BRCwgMikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX05VTSwgMykKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX0xJU1QsIDQpCkRFRklORV9LU1VfVUFQSV9DT05TVChfX3UzMiwgU1VLSVNVX0tQTV9JTkZPLCA1KQpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fQ09OVFJPTCwgNikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1ZFUlNJT04sIDcpCgpzdHJ1Y3Qga3N1X2twbV9jbWQgewogICAgX19hbGlnbmVkX3U2NCBjb250cm9sX2NvZGU7CiAgICBfX2FsaWduZWRfdTY0IGFyZzE7CiAgICBfX2FsaWduZWRfdTY0IGFyZzI7CiAgICBfX2FsaWduZWRfdTY0IHJlc3VsdF9jb2RlOwp9OwoK'
+          echo "$KPM_B64" | base64 -d > /tmp/kpm_supercall.snippet
+          cat /tmp/kpm_supercall.snippet
+          # Insert snippet before "/* IOCTL command definitions */" line
+          python3 -c "p='./KernelSU/uapi/supercall.h'; t=open(p).read(); m='/* IOCTL command definitions */'; i=t.find(m); assert i>0, "marker not found"; s=open('/tmp/kpm_supercall.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
+          echo "✓ uapi/supercall.h 已加上 KPM 常量和 struct"
+          # 5) Patch ReSukiSU Kbuild to include kpm objects
           if ! grep -q "CONFIG_KPM) += kpm/compact.o" ./KernelSU/kernel/Kbuild; then
             python3 -c "p='./KernelSU/kernel/Kbuild'; t=open(p).read(); ls=('obj-\$(CONFIG_KPM) += kpm/compact.o\n','obj-\$(CONFIG_KPM) += kpm/kpm.o\n','obj-\$(CONFIG_KPM) += kpm/super_access.o\n'); m='# Keep a new line here!!'; i=t.find(m); open(p,'w').write(t[:i]+(''.join(ls))+t[i:])"
             echo "✓ Kbuild 已加上 KPM 对象引用"
           fi
-          # 5) Patch Kconfig: insert config KPM block before first "endmenu"
+          # 6) Patch ReSukiSU Kconfig to add KPM option
           if ! grep -q "^config KPM" ./KernelSU/kernel/Kconfig; then
-            KPM_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
-            echo "$KPM_B64" | base64 -d > /tmp/kpm_config.snippet
-            cat /tmp/kpm_config.snippet
-            python3 -c "p='./KernelSU/kernel/Kconfig'; t=open(p).read(); m='endmenu'; i=t.rfind(m); s=open('/tmp/kpm_config.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
+            KPM_KCFG_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
+            echo "$KPM_KCFG_B64" | base64 -d > /tmp/kpm_kconfig.snippet
+            python3 -c "p='./KernelSU/kernel/Kconfig'; t=open(p).read(); m='endmenu'; i=t.rfind(m); s=open('/tmp/kpm_kconfig.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
             echo "✓ Kconfig 已加上 config KPM 选项"
           fi
-          # 6) Final sanity check
-          echo "=== ReSukiSU kernel/kpm/ 目录 ==="
-          ls -la ./KernelSU/kernel/kpm/
-          echo "=== Kbuild 中 KPM 相关 ==="
+          # 7) Patch compact.c: rename ksu_manager_appid -> ksu_last_manager_appid
+          #    (ReSukiSU renames the global; same u16 type so semantically compatible)
+          if grep -q "ksu_manager_appid" ./KernelSU/kernel/kpm/compact.c; then
+            sed -i "s/ksu_manager_appid/ksu_last_manager_appid/g" ./KernelSU/kernel/kpm/compact.c
+            echo "✓ compact.c 已将 ksu_manager_appid 改为 ksu_last_manager_appid"
+          fi
+          # 8) Final sanity check
+          echo "=== kpm/ 目录 ==="
+          ls ./KernelSU/kernel/kpm/
+          echo "=== Kbuild KPM 行 ==="
           grep "CONFIG_KPM" ./KernelSU/kernel/Kbuild
-          echo "=== Kconfig 中 KPM 相关 ==="
-          grep -A8 "^config KPM" ./KernelSU/kernel/Kconfig
+          echo "=== uapi/supercall.h 中 KPM 常量 ==="
+          grep "SUKISU_KPM\|ksu_kpm_cmd" ./KernelSU/uapi/supercall.h | head -10
+          echo "=== Kconfig KPM 段 ==="
+          grep -A8 "^config KPM" ./KernelSU/kernel/Kconfig | head -10
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
