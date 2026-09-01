@@ -594,7 +594,7 @@ jobs:
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
           cd kernel_workspace
-          git clone --depth=1 https://github.com/cctv18/susfs4oki.git susfs4ksu -b oki-android15-6.6
+          git clone --depth=1 https://github.com/ShirkNeko/susfs4ksu.git susfs4ksu -b gki-android15-6.6
           wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8750/main/other_patch/69_hide_stuff.patch -O ./common/69_hide_stuff.patch
           cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
@@ -602,6 +602,11 @@ jobs:
           cd ./common
           patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
           patch -p1 -N -F 3 < 69_hide_stuff.patch || true
+          cd ..
+          cd ./KernelSU
+          echo "正在对 SukiSU-Ultra 驱动应用 10_enable_susfs_for_ksu.patch..."
+          patch -p1 --fuzz=3 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
+          grep -q "config KSU_SUSFS" ./kernel/Kconfig || { echo "::error::KSU_SUSFS 未进入驱动 Kconfig"; exit 1; }
           echo "[OK] SUSFS 补丁处理流程全部完成"
 
       - name: 🔧 Set gki_defconfig (设置编译配置) 
