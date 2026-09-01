@@ -582,10 +582,10 @@ jobs:
         run: |
           cd kernel_workspace
           echo "正在配置 SukiSU-Ultra 原生内核驱动（原生 KPM 支持，锁定 v4.1.3）..."
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
           cd ./KernelSU
-          git checkout v4.1.3
-          echo "当前驱动 commit: $(git rev-parse --short HEAD) tag: $(git describe --tags --exact-match 2>/dev/null || echo none)"
+          echo "当前驱动分支: $(git rev-parse --abbrev-ref HEAD) commit: $(git rev-parse --short HEAD)"
+          grep -q "config KSU_SUSFS" ./kernel/Kconfig || { echo "::error::builtin 分支缺少 KSU_SUSFS Kconfig"; exit 1; }
           # 与管理器 v4.1.3 同源，驱动会自行计算真实版本号
           echo "KSUVER=40796" >> $GITHUB_ENV
           echo "ksuver=40796" >> $GITHUB_OUTPUT
@@ -594,7 +594,7 @@ jobs:
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
           cd kernel_workspace
-          git clone --depth=1 https://github.com/ShirkNeko/susfs4ksu.git susfs4ksu -b gki-android15-6.6
+          git clone --depth=1 https://github.com/cctv18/susfs4oki.git susfs4ksu -b oki-android15-6.6
           wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8750/main/other_patch/69_hide_stuff.patch -O ./common/69_hide_stuff.patch
           cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
@@ -604,9 +604,6 @@ jobs:
           patch -p1 -N -F 3 < 69_hide_stuff.patch || true
           cd ..
           cd ./KernelSU
-          echo "正在对 SukiSU-Ultra 驱动应用 10_enable_susfs_for_ksu.patch..."
-          patch -p1 --fuzz=3 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-          grep -q "config KSU_SUSFS" ./kernel/Kconfig || { echo "::error::KSU_SUSFS 未进入驱动 Kconfig"; exit 1; }
           echo "[OK] SUSFS 补丁处理流程全部完成"
 
       - name: 🔧 Set gki_defconfig (设置编译配置) 
