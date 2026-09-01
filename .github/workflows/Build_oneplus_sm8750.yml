@@ -642,6 +642,12 @@ jobs:
           grep "SUKISU_KPM\|ksu_kpm_cmd" ./KernelSU/uapi/supercall.h | head -10
           echo "=== Kconfig KPM 段 ==="
           grep -A8 "^config KPM" ./KernelSU/kernel/Kconfig | head -10
+          echo "=== compact.c 前 30 行（看 include） ==="
+          head -30 ./KernelSU/kernel/kpm/compact.c
+          echo "=== kpm.h 前 30 行（看 include） ==="
+          head -30 ./KernelSU/kernel/kpm/kpm.h
+          echo "=== compact.c ksu_manager_appid 残留检查 ==="
+          grep -n "ksu_manager_appid\|ksu_last_manager_appid" ./KernelSU/kernel/kpm/compact.c | head -10
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
@@ -774,7 +780,21 @@ jobs:
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
+          # Debug: KPM backport build diagnostic - log all output, dump errors on failure
+          BUILD_LOG=/tmp/build_kernel.log
+          : > "$BUILD_LOG"
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image 2>&1 | tee -a "$BUILD_LOG"
+          BUILD_RC=${PIPESTATUS[0]}
+          if [ $BUILD_RC -ne 0 ]; then
+            echo "::error::Kernel build failed with exit code $BUILD_RC"
+            echo "=== 编译错误摘要 (grep error/warning) ==="
+            grep -E "error:|warning:|undeclared|undefined reference|No such file" "$BUILD_LOG" | head -60
+            echo "=== 编译错误最后 80 行 ==="
+            tail -80 "$BUILD_LOG"
+            echo "=== kpm/ 目录编译命令 ==="
+            grep -E "kernel/kpm/" "$BUILD_LOG" | head -10
+            exit $BUILD_RC
+          fi
           LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
           echo "ccache 状态："
           ccache -s
