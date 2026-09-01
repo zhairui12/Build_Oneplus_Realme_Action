@@ -612,19 +612,62 @@ jobs:
           KPM_B64='Ci8qIEtQTSBjb250cm9sIGNvZGVzIChiYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhKSAqLwpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fTE9BRCwgMSkKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1VOTE9BRCwgMikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX05VTSwgMykKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX0xJU1QsIDQpCkRFRklORV9LU1VfVUFQSV9DT05TVChfX3UzMiwgU1VLSVNVX0tQTV9JTkZPLCA1KQpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fQ09OVFJPTCwgNikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1ZFUlNJT04sIDcpCgpzdHJ1Y3Qga3N1X2twbV9jbWQgewogICAgX19hbGlnbmVkX3U2NCBjb250cm9sX2NvZGU7CiAgICBfX2FsaWduZWRfdTY0IGFyZzE7CiAgICBfX2FsaWduZWRfdTY0IGFyZzI7CiAgICBfX2FsaWduZWRfdTY0IHJlc3VsdF9jb2RlOwp9OwoK'
           echo "$KPM_B64" | base64 -d > /tmp/kpm_supercall.snippet
           cat /tmp/kpm_supercall.snippet
-          # Insert snippet before "/* IOCTL command definitions */" line
-          python3 -c "p='./KernelSU/uapi/supercall.h'; t=open(p).read(); m='/* IOCTL command definitions */'; i=t.find(m); assert i>0, "marker not found"; s=open('/tmp/kpm_supercall.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
+          # Insert snippet before "/* IOCTL command definitions */" line using heredoc (no quote conflicts)
+          cat > /tmp/patch_supercall.py <<'PYEOF'
+p = './KernelSU/uapi/supercall.h'
+with open(p) as f:
+    t = f.read()
+m = '/* IOCTL command definitions */'
+i = t.find(m)
+if i < 0:
+    raise SystemExit('marker not found at all')
+with open('/tmp/kpm_supercall.snippet') as f:
+    s = f.read()
+with open(p, 'w') as f:
+    f.write(t[:i] + s + t[i:])
+print(f'✓ Inserted {len(s)} bytes at offset {i}')
+PYEOF
+          python3 /tmp/patch_supercall.py
           echo "✓ uapi/supercall.h 已加上 KPM 常量和 struct"
           # 5) Patch ReSukiSU Kbuild to include kpm objects
           if ! grep -q "CONFIG_KPM) += kpm/compact.o" ./KernelSU/kernel/Kbuild; then
-            python3 -c "p='./KernelSU/kernel/Kbuild'; t=open(p).read(); ls=('obj-\$(CONFIG_KPM) += kpm/compact.o\n','obj-\$(CONFIG_KPM) += kpm/kpm.o\n','obj-\$(CONFIG_KPM) += kpm/super_access.o\n'); m='# Keep a new line here!!'; i=t.find(m); open(p,'w').write(t[:i]+(''.join(ls))+t[i:])"
+            cat > /tmp/patch_kbuild.py <<'PYEOF'
+p = './KernelSU/kernel/Kbuild'
+with open(p) as f:
+    t = f.read()
+ls = ('obj-$(CONFIG_KPM) += kpm/compact.o\n',
+      'obj-$(CONFIG_KPM) += kpm/kpm.o\n',
+      'obj-$(CONFIG_KPM) += kpm/super_access.o\n')
+m = '# Keep a new line here!!'
+i = t.find(m)
+if i < 0:
+    raise SystemExit('Kbuild marker not found')
+with open(p, 'w') as f:
+    f.write(t[:i] + ''.join(ls) + t[i:])
+print(f'✓ Kbuild patched at offset {i}')
+PYEOF
+            python3 /tmp/patch_kbuild.py
             echo "✓ Kbuild 已加上 KPM 对象引用"
           fi
           # 6) Patch ReSukiSU Kconfig to add KPM option
           if ! grep -q "^config KPM" ./KernelSU/kernel/Kconfig; then
             KPM_KCFG_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
             echo "$KPM_KCFG_B64" | base64 -d > /tmp/kpm_kconfig.snippet
-            python3 -c "p='./KernelSU/kernel/Kconfig'; t=open(p).read(); m='endmenu'; i=t.rfind(m); s=open('/tmp/kpm_kconfig.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
+            cat > /tmp/patch_kconfig.py <<'PYEOF'
+p = './KernelSU/kernel/Kconfig'
+with open(p) as f:
+    t = f.read()
+m = 'endmenu'
+i = t.rfind(m)
+if i < 0:
+    raise SystemExit('Kconfig marker not found')
+with open('/tmp/kpm_kconfig.snippet') as f:
+    s = f.read()
+with open(p, 'w') as f:
+    f.write(t[:i] + s + t[i:])
+print(f'✓ Kconfig patched at offset {i}')
+PYEOF
+            python3 /tmp/patch_kconfig.py
             echo "✓ Kconfig 已加上 config KPM 选项"
           fi
           # 7) Patch compact.c: rename ksu_manager_appid -> ksu_last_manager_appid
