@@ -793,12 +793,24 @@ jobs:
             tail -80 "$BUILD_LOG"
             echo "=== kpm/ 目录编译命令 ==="
             grep -E "kernel/kpm/" "$BUILD_LOG" | head -10
+            # Upload build log as artifact for offline inspection
+            mkdir -p /tmp/diag_artifact
+            cp "$BUILD_LOG" /tmp/diag_artifact/build_kernel.log
+            # Also save grep-filtered lines
+            grep -E "error:|warning:|undeclared|undefined reference|No such file|kernel/kpm" "$BUILD_LOG" > /tmp/diag_artifact/build_errors.log
             exit $BUILD_RC
           fi
           LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
           echo "ccache 状态："
           ccache -s
-      
+
+      - name: 📤 Upload build log on failure (失败时上传 build log)
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: build_kernel_diag
+          path: /tmp/diag_artifact/
+
       - name: 🕒 Calculate build time (计算构建时间)
         run: |
           END=$(date +%s)
