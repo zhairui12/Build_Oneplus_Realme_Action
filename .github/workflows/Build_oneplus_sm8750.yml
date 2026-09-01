@@ -577,18 +577,33 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./security/Kconfig
 
           
-      - name: ⚙️ Set ReSukiSU (设置ReSukiSU)
+      - name: ⚙️ Set SukiSU Ultra with KPM (使用 SukiSU Ultra 主仓库以启用 KPM)
         id: ksu_step
         run: |
           cd kernel_workspace
-          echo "正在配置ReSukiSU..."
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s main
-          cd ./KernelSU 
-          KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 114514)
+          echo "正在配置 SukiSU Ultra (主仓库含 KPM 模块)..."
+          # NOTE: ReSukiSU/ReSukiSU fork 删除了 KPM 模块，
+          #       必须改用 SukiSU-Ultra/SukiSU-Ultra 主仓库。
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s main
+          cd ./KernelSU
+          # SukiSU Ultra 版本号规则: commits + 10000
+          KSU_VERSION=$(expr $(git rev-list --count main) + 10000 2>/dev/null || echo 114514)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
-          
-            
+
+      - name: ✅ Verify CONFIG_KPM=y in gki_defconfig (验证 KPM 真的写进 defconfig)
+        run: |
+          cd kernel_workspace
+          # 必须 CONFIG_KPM=y 实际出现在 gki_defconfig，否则 KPM 不会编译进内核。
+          if grep -q "^CONFIG_KPM=y" ./common/arch/arm64/configs/gki_defconfig; then
+            echo "✓ CONFIG_KPM=y 已确认进入 gki_defconfig"
+            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig
+          else
+            echo "::error::CONFIG_KPM=y 未出现在 gki_defconfig，KPM 不会被编译进内核"
+            grep -n "CONFIG_KPM" ./common/arch/arm64/configs/gki_defconfig || echo "(no CONFIG_KPM line at all)"
+            exit 1
+          fi
+
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
