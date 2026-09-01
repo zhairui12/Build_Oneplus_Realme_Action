@@ -618,7 +618,7 @@ jobs:
           echo "✓ uapi/supercall.h 已加上 KPM 常量和 struct"
           # 5) Patch ReSukiSU Kbuild to include kpm objects
           if ! grep -q "CONFIG_KPM) += kpm/compact.o" ./KernelSU/kernel/Kbuild; then
-            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LYnVpbGQiCndpdGggb3BlbihwKSBhcyBmOgogICAgdCA9IGYucmVhZCgpCmxzID0gKCJvYmotJChDT05GSUdfS1BNKSArPSBrcG0vY29tcGFjdC5vCiIsCiAgICAgICJvYmotJChDT05GSUdfS1BNKSArPSBrcG0va3BtLm8KIiwKICAgICAgIm9iai0kKENPTkZJR19LUE0pICs9IGtwbS9zdXBlcl9hY2Nlc3MubwoiKQptID0gIiMgS2VlcCBhIG5ldyBsaW5lIGhlcmUhISIKaSA9IHQuZmluZChtKQppZiBpIDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIktidWlsZCBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKHAsICJ3IikgYXMgZjoKICAgIGYud3JpdGUodFs6aV0gKyAiIi5qb2luKGxzKSArIHRbaTpdKQpwcmludChmIktidWlsZCBwYXRjaGVkIGF0IG9mZnNldCB7aX0iKQo=" | base64 -d > /tmp/patch_kbuild.py
+            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LYnVpbGQiCndpdGggb3BlbihwKSBhcyBmOgogICAgdCA9IGYucmVhZCgpCmxzID0gKCJvYmotJChDT05GSUdfS1BNKSArPSBrcG0vY29tcGFjdC5vXG4iLAogICAgICAib2JqLSQoQ09ORklHX0tQTSkgKz0ga3BtL2twbS5vXG4iLAogICAgICAib2JqLSQoQ09ORklHX0tQTSkgKz0ga3BtL3N1cGVyX2FjY2Vzcy5vXG4iKQptID0gIiMgS2VlcCBhIG5ldyBsaW5lIGhlcmUhISIKaSA9IHQuZmluZChtKQppZiBpIDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIktidWlsZCBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKHAsICJ3IikgYXMgZjoKICAgIGYud3JpdGUodFs6aV0gKyAiIi5qb2luKGxzKSArIHRbaTpdKQpwcmludChmIktidWlsZCBwYXRjaGVkIGF0IG9mZnNldCB7aX0iKQo=" | base64 -d > /tmp/patch_kbuild.py
             python3 /tmp/patch_kbuild.py
             echo "✓ Kbuild 已加上 KPM 对象引用"
           fi
