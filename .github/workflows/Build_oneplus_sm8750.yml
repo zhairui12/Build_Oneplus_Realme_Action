@@ -577,20 +577,58 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./security/Kconfig
 
           
-      - name: ⚙️ Set SukiSU Ultra with KPM (使用 SukiSU Ultra 主仓库以启用 KPM)
+      - name: ⚙️ Set ReSukiSU + backport KPM (使用 ReSukiSU fork + 从 SukiSU-Ultra 移植 KPM)
         id: ksu_step
         run: |
           cd kernel_workspace
-          echo "正在配置 SukiSU Ultra (主仓库含 KPM 模块)..."
-          # NOTE: ReSukiSU/ReSukiSU fork 删除了 KPM 模块，
-          #       必须改用 SukiSU-Ultra/SukiSU-Ultra 主仓库。
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s main
+          echo "正在配置 ReSukiSU 内核驱动（之后再从 SukiSU-Ultra 把 KPM 模块移植回来）..."
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
           cd ./KernelSU
-          # SukiSU Ultra 版本号规则: commits + 10000
-          KSU_VERSION=$(expr $(git rev-list --count main) + 10000 2>/dev/null || echo 114514)
+          # ReSukiSU 版本号规则: 30700 + commits
+          KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 114514)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
 
+      - name: 🔀 Backport KPM from SukiSU-Ultra into ReSukiSU (把 KPM 模块移植回来)
+        run: |
+          set -e
+          cd kernel_workspace
+          echo "正在从 SukiSU-Ultra 主仓库复制 kpm/ 目录到 ReSukiSU 源码树..."
+          # 1) Clone SukiSU-Ultra shallow to /tmp
+          rm -rf /tmp/sukisu-ultra-src
+          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/sukisu-ultra-src
+          # 2) Sanity check that kernel/kpm/ exists
+          if [ ! -d /tmp/sukisu-ultra-src/kernel/kpm ]; then
+            echo "::error::SukiSU-Ultra 主仓库已没有 kernel/kpm/ 目录，移植失败"
+            exit 1
+          fi
+          ls -la /tmp/sukisu-ultra-src/kernel/kpm/
+          # 3) Copy kpm/ files into ReSukiSU
+          mkdir -p ./KernelSU/kernel/kpm
+          cp /tmp/sukisu-ultra-src/kernel/kpm/*.c \
+             /tmp/sukisu-ultra-src/kernel/kpm/*.h \
+             ./KernelSU/kernel/kpm/
+          echo "✓ kpm/ 目录已复制到 ReSukiSU"
+          # 4) Patch Kbuild: insert 3 obj-$(CONFIG_KPM) lines before "# Keep a new line"
+          if ! grep -q "CONFIG_KPM) += kpm/compact.o" ./KernelSU/kernel/Kbuild; then
+            python3 -c "p='./KernelSU/kernel/Kbuild'; t=open(p).read(); ls=('obj-\$(CONFIG_KPM) += kpm/compact.o\n','obj-\$(CONFIG_KPM) += kpm/kpm.o\n','obj-\$(CONFIG_KPM) += kpm/super_access.o\n'); m='# Keep a new line here!!'; i=t.find(m); open(p,'w').write(t[:i]+(''.join(ls))+t[i:])"
+            echo "✓ Kbuild 已加上 KPM 对象引用"
+          fi
+          # 5) Patch Kconfig: insert config KPM block before first "endmenu"
+          if ! grep -q "^config KPM" ./KernelSU/kernel/Kconfig; then
+            KPM_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
+            echo "$KPM_B64" | base64 -d > /tmp/kpm_config.snippet
+            cat /tmp/kpm_config.snippet
+            python3 -c "p='./KernelSU/kernel/Kconfig'; t=open(p).read(); m='endmenu'; i=t.rfind(m); s=open('/tmp/kpm_config.snippet').read(); open(p,'w').write(t[:i]+s+t[i:])"
+            echo "✓ Kconfig 已加上 config KPM 选项"
+          fi
+          # 6) Final sanity check
+          echo "=== ReSukiSU kernel/kpm/ 目录 ==="
+          ls -la ./KernelSU/kernel/kpm/
+          echo "=== Kbuild 中 KPM 相关 ==="
+          grep "CONFIG_KPM" ./KernelSU/kernel/Kbuild
+          echo "=== Kconfig 中 KPM 相关 ==="
+          grep -A8 "^config KPM" ./KernelSU/kernel/Kconfig
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
