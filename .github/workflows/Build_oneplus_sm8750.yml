@@ -577,93 +577,19 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./security/Kconfig
 
           
-      - name: ⚙️ Set ReSukiSU + backport KPM (使用 ReSukiSU fork + 从 SukiSU-Ultra 移植 KPM)
+      - name: ⚙️ Set SukiSU-Ultra native driver (pin v4.1.3 = manager 40796)
         id: ksu_step
         run: |
           cd kernel_workspace
-          echo "正在配置 ReSukiSU 内核驱动（之后再从 SukiSU-Ultra 把 KPM 模块移植回来）..."
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          echo "正在配置 SukiSU-Ultra 原生内核驱动（原生 KPM 支持，锁定 v4.1.3）..."
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
           cd ./KernelSU
-          # ReSukiSU 版本号规则: 30700 + commits
-          KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 114514)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
+          git checkout v4.1.3
+          echo "当前驱动 commit: $(git rev-parse --short HEAD) tag: $(git describe --tags --exact-match 2>/dev/null || echo none)"
+          # 与管理器 v4.1.3 同源，驱动会自行计算真实版本号
+          echo "KSUVER=40796" >> $GITHUB_ENV
+          echo "ksuver=40796" >> $GITHUB_OUTPUT
 
-      - name: 🔀 Backport KPM from SukiSU-Ultra into ReSukiSU (把 KPM 模块移植回来)
-        run: |
-          set -e
-          cd kernel_workspace
-          echo "正在从 SukiSU-Ultra 主仓库复制 kpm/ 目录到 ReSukiSU 源码树..."
-          # 1) Clone SukiSU-Ultra shallow to /tmp
-          rm -rf /tmp/sukisu-ultra-src
-          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/sukisu-ultra-src
-          # 2) Sanity check
-          if [ ! -d /tmp/sukisu-ultra-src/kernel/kpm ]; then
-            echo "::error::SukiSU-Ultra 主仓库已没有 kernel/kpm/ 目录，移植失败"
-            exit 1
-          fi
-          # 3) Copy kpm/ files into ReSukiSU
-          mkdir -p ./KernelSU/kernel/kpm
-          cp /tmp/sukisu-ultra-src/kernel/kpm/*.c \
-             /tmp/sukisu-ultra-src/kernel/kpm/*.h \
-             ./KernelSU/kernel/kpm/
-          echo "✓ kpm/ 目录已复制到 ReSukiSU"
-          # 4) Patch ReSukiSU uapi/supercall.h to add KPM constants + struct
-          KPM_B64='Ci8qIEtQTSBjb250cm9sIGNvZGVzIChiYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhKSAqLwpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fTE9BRCwgMSkKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1VOTE9BRCwgMikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX05VTSwgMykKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX0xJU1QsIDQpCkRFRklORV9LU1VfVUFQSV9DT05TVChfX3UzMiwgU1VLSVNVX0tQTV9JTkZPLCA1KQpERUZJTkVfS1NVX1VBUElfQ09OU1QoX191MzIsIFNVS0lTVV9LUE1fQ09OVFJPTCwgNikKREVGSU5FX0tTVV9VQVBJX0NPTlNUKF9fdTMyLCBTVUtJU1VfS1BNX1ZFUlNJT04sIDcpCgpzdHJ1Y3Qga3N1X2twbV9jbWQgewogICAgX19hbGlnbmVkX3U2NCBjb250cm9sX2NvZGU7CiAgICBfX2FsaWduZWRfdTY0IGFyZzE7CiAgICBfX2FsaWduZWRfdTY0IGFyZzI7CiAgICBfX2FsaWduZWRfdTY0IHJlc3VsdF9jb2RlOwp9OwoK'
-          echo "$KPM_B64" | base64 -d > /tmp/kpm_supercall.snippet
-          cat /tmp/kpm_supercall.snippet
-          # Insert snippet before "/* IOCTL command definitions */" via base64-encoded python script (avoids all heredoc/quote issues)
-          echo "cCA9ICIuL0tlcm5lbFNVL3VhcGkvc3VwZXJjYWxsLmgiCndpdGggb3BlbihwKSBhcyBmOgogICAgdCA9IGYucmVhZCgpCm0gPSAiLyogSU9DVEwgY29tbWFuZCBkZWZpbml0aW9ucyAqLyIKaSA9IHQuZmluZChtKQppZiBpIDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIm1hcmtlciBub3QgZm91bmQgYXQgYWxsIikKd2l0aCBvcGVuKCIvdG1wL2twbV9zdXBlcmNhbGwuc25pcHBldCIpIGFzIGY6CiAgICBzID0gZi5yZWFkKCkKd2l0aCBvcGVuKHAsICJ3IikgYXMgZjoKICAgIGYud3JpdGUodFs6aV0gKyBzICsgdFtpOl0pCnByaW50KGYiSW5zZXJ0ZWQge2xlbihzKX0gYnl0ZXMgYXQgb2Zmc2V0IHtpfSIpCg==" | base64 -d > /tmp/patch_supercall.py
-          python3 /tmp/patch_supercall.py
-          echo "✓ uapi/supercall.h 已加上 KPM 常量和 struct"
-          # 5) Patch ReSukiSU Kbuild to include kpm objects
-          if ! grep -q "CONFIG_KPM) += kpm/compact.o" ./KernelSU/kernel/Kbuild; then
-            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LYnVpbGQiCndpdGggb3BlbihwKSBhcyBmOgogICAgdCA9IGYucmVhZCgpCmxzID0gKCJvYmotJChDT05GSUdfS1BNKSArPSBrcG0vY29tcGFjdC5vXG4iLAogICAgICAib2JqLSQoQ09ORklHX0tQTSkgKz0ga3BtL2twbS5vXG4iLAogICAgICAib2JqLSQoQ09ORklHX0tQTSkgKz0ga3BtL3N1cGVyX2FjY2Vzcy5vXG4iKQptID0gIiMgS2VlcCBhIG5ldyBsaW5lIGhlcmUhISIKaSA9IHQuZmluZChtKQppZiBpIDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIktidWlsZCBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKHAsICJ3IikgYXMgZjoKICAgIGYud3JpdGUodFs6aV0gKyAiIi5qb2luKGxzKSArIHRbaTpdKQpwcmludChmIktidWlsZCBwYXRjaGVkIGF0IG9mZnNldCB7aX0iKQo=" | base64 -d > /tmp/patch_kbuild.py
-            python3 /tmp/patch_kbuild.py
-            echo "✓ Kbuild 已加上 KPM 对象引用"
-          fi
-          # 6) Patch ReSukiSU Kconfig to add KPM option
-          if ! grep -q "^config KPM" ./KernelSU/kernel/Kconfig; then
-            KPM_KCFG_B64='CmNvbmZpZyBLUE0KICAgIGJvb2wgIkVuYWJsZSBTdWtpU1UgS1BNIChiYWNrcG9ydGVkKSIKICAgIGRlcGVuZHMgb24gS1NVICYmIDY0QklUCiAgICBkZWZhdWx0IG4KICAgIGhlbHAKICAgICAgRW5hYmxpbmcgdGhpcyBvcHRpb24gd2lsbCBhY3RpdmF0ZSB0aGUgS1BNIGZlYXR1cmUgb2YgU3VraVNVLgogICAgICBCYWNrcG9ydGVkIGZyb20gU3VraVNVLVVsdHJhIG1haW4gaW50byBSZVN1a2lTVS4KICAgIHNlbGVjdCBLQUxMU1lNUwogICAgc2VsZWN0IEtBTExTWU1TX0FMTAo='
-            echo "$KPM_KCFG_B64" | base64 -d > /tmp/kpm_kconfig.snippet
-            echo "cCA9ICIuL0tlcm5lbFNVL2tlcm5lbC9LY29uZmlnIgp3aXRoIG9wZW4ocCkgYXMgZjoKICAgIHQgPSBmLnJlYWQoKQptID0gImVuZG1lbnUiCmkgPSB0LnJmaW5kKG0pCmlmIGkgPCAwOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiS2NvbmZpZyBtYXJrZXIgbm90IGZvdW5kIikKd2l0aCBvcGVuKCIvdG1wL2twbV9rY29uZmlnLnNuaXBwZXQiKSBhcyBmOgogICAgcyA9IGYucmVhZCgpCndpdGggb3BlbihwLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKHRbOmldICsgcyArIHRbaTpdKQpwcmludChmIktjb25maWcgcGF0Y2hlZCBhdCBvZmZzZXQge2l9IikK" | base64 -d > /tmp/patch_kconfig.py
-            python3 /tmp/patch_kconfig.py
-            echo "✓ Kconfig 已加上 config KPM 选项"
-          fi
-          # 7) Patch compact.c: rename ksu_manager_appid -> ksu_last_manager_appid
-          #    (ReSukiSU renames the global; same u16 type so semantically compatible)
-          if grep -q "ksu_manager_appid" ./KernelSU/kernel/kpm/compact.c; then
-            sed -i "s/ksu_manager_appid/ksu_last_manager_appid/g" ./KernelSU/kernel/kpm/compact.c
-            echo "✓ compact.c 已将 ksu_manager_appid 改为 ksu_last_manager_appid"
-          fi
-          # 8) Final sanity check
-          echo "=== kpm/ 目录 ==="
-          ls ./KernelSU/kernel/kpm/
-          echo "=== Kbuild KPM 行 ==="
-          grep "CONFIG_KPM" ./KernelSU/kernel/Kbuild
-          echo "=== uapi/supercall.h 中 KPM 常量 ==="
-          grep "SUKISU_KPM\|ksu_kpm_cmd" ./KernelSU/uapi/supercall.h | head -10
-          echo "=== Kconfig KPM 段 ==="
-          grep -A8 "^config KPM" ./KernelSU/kernel/Kconfig | head -10
-          echo "=== compact.c 前 30 行（看 include） ==="
-          head -30 ./KernelSU/kernel/kpm/compact.c
-          echo "=== kpm.h 前 30 行（看 include） ==="
-          head -30 ./KernelSU/kernel/kpm/kpm.h
-          echo "=== compact.c ksu_manager_appid 残留检查 ==="
-          grep -n "ksu_manager_appid\|ksu_last_manager_appid" ./KernelSU/kernel/kpm/compact.c | head -10
-          echo "=== 验证 SUKISU_KPM 常量真的在 patched supercall.h 里 ==="
-          (grep -c "SUKISU_KPM\|ksu_kpm_cmd" ./KernelSU/uapi/supercall.h || echo "0")
-          echo "=== 验证 compact.c 中包含 supercall.h 的路径 ==="
-          grep -E "include.*supercall" ./KernelSU/kernel/kpm/kpm.h ./KernelSU/kernel/kpm/compact.c ./KernelSU/kernel/kpm/super_access.c 2>/dev/null | head -5
-          echo "=== 把 patched 文件存为诊断 artifact ==="
-          mkdir -p /tmp/diag_artifact
-          cp ./KernelSU/uapi/supercall.h /tmp/diag_artifact/supercall_patched.h || true
-          cp ./KernelSU/kernel/Kbuild /tmp/diag_artifact/Kbuild_patched || true
-          cp ./KernelSU/kernel/Kconfig /tmp/diag_artifact/Kconfig_patched || true
-          cp ./KernelSU/kernel/kpm/compact.c /tmp/diag_artifact/compact_patched.c 2>/dev/null || true
-          cp ./KernelSU/kernel/kpm/kpm.h /tmp/diag_artifact/kpm.h 2>/dev/null || true
-          echo "diag artifact dir contents:"
-          ls -la /tmp/diag_artifact/
       - name: 🔧 Set up SUSFS (配置 SUSFS)
         if: ${{ env.ENABLE_SUSFS == 'true' }}
         run: |
@@ -901,7 +827,7 @@ jobs:
       - name: 📤 Upload AnyKernel3 (上传 Anykernel3)
         uses: actions/upload-artifact@v6
         with:
-         name: AK3_${{ env.KSUVER }}_${{ env.DEVICES_NAME }}_ReSukiSU
+         name: AK3_${{ env.KSUVER }}_${{ env.DEVICES_NAME }}_SukiSUUltra
          path: ./AnyKernel3/*
 
   upload_rekernel:
@@ -1074,7 +1000,7 @@ jobs:
           if [ "${{ github.event.inputs.enable_droidspaces }}" = "true" ]; then
             FEATURES="${FEATURES}- ✅ Droidspaces 容器支持"$'\n'
           fi
-          FEATURES="${FEATURES}- ✅ ReSukiSU (KernelSU)"$'\n'
+          FEATURES="${FEATURES}- ✅ SukiSUUltra (KernelSU)"$'\n'
           if [ "${{ github.event.inputs.enable_susfs }}" = "true" ]; then
             FEATURES="${FEATURES}- ✅ SUSFS 挂载支持"$'\n'
           fi
@@ -1096,7 +1022,7 @@ jobs:
           ### 📱 SM8750 欧加真通用内核 | 构建信息
 
           - **内核版本**: SM8750 (Android 15 / 6.6)
-          - **ReSukiSU 版本**: ${KSU_VER}
+          - **SukiSUUltra 版本**: ${KSU_VER}
           - **编译时间**: ${TIME_FORM}
           - **编译机型**: ${DEVICE_NAME}
           - **内核后缀**: ${KERNEL_SUFFIX}
@@ -1110,18 +1036,18 @@ jobs:
           ${FEATURES}
           ### ⏫️ 更新内容
 
-          - 更新 ReSukiSU 至最新版本 (${KSU_VER})
+          - 更新 SukiSUUltra 至最新版本 (${KSU_VER})
           - 同步上游内核源码
 
           ### 📋 安装方法 | Installation Guide
 
-          1. 若你已刷入 ReSukiSU 内核，且 ReSukiSU 管理器已更新至最新版本，可在管理器中直接刷入 AnyKernel 刷机包并重启；
+          1. 若你已刷入 SukiSUUltra 内核，且 SukiSUUltra 管理器已更新至最新版本，可在管理器中直接刷入 AnyKernel 刷机包并重启；
           2. 由于 KernelSU 上游更新了元模块功能，最新版 KSU 管理器需要配合元模块 (metamodule) 才能正常挂载模块。目前的元模块包括 [meta overlayfs](https://github.com/KernelSU-Modules-Repo/meta-overlayfs), [mountify](https://github.com/backslashxx/mountify), [meta magicmount](https://github.com/7a72/meta-magic_mount/) 等。若你是第一次使用 KSU 或刚从旧版 KSU 管理器升级至新版，请先安装一个元模块；
           3. 若启用 Re-Kernel，需刷入配套Re-Kernel模块并配合 NoActive 软件使用，以提升后台冻结能力。
 
           #### 🔗 相关链接
 
-          - ReSukiSU 管理器: [ReSukiSU_CI](https://github.com/cctv18/ReSukiSU_CI/releases)
+          - SukiSUUltra 管理器: [SukiSUUltra_CI](https://github.com/cctv18/SukiSUUltra_CI/releases)
           - SukiSU Ultra 管理器: [SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases)
           - KernelSU Next 管理器: [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next/releases)
           - KernelSU 原版管理器: [KernelSU](https://github.com/tiann/KernelSU/releases)
