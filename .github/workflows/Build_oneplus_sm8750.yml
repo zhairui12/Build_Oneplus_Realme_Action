@@ -584,7 +584,8 @@ jobs:
           echo "正在配置 SukiSU-Ultra 原生内核驱动（原生 KPM 支持，锁定 v4.1.3）..."
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
           cd ./KernelSU
-          echo "当前驱动分支: $(git rev-parse --abbrev-ref HEAD) commit: $(git rev-parse --short HEAD)"
+          git checkout 6c13a069
+          echo "当前驱动: builtin @ 6c13a069 (v4.1.3 同期, 适配管理器 40796)"
           grep -q "config KSU_SUSFS" ./kernel/Kconfig || { echo "::error::builtin 分支缺少 KSU_SUSFS Kconfig"; exit 1; }
           # builtin 分支同步时丢失了 kernel_umount_feature_set，从 main 分支补回
           python3 - <<'PYEOF'
