@@ -847,6 +847,22 @@ jobs:
          name: AK3_${{ env.KSUVER }}_${{ env.DEVICES_NAME }}_SukiSUUltra
          path: ./AnyKernel3/*
 
+      - name: 📦 Make plain AnyKernel3 with raw Image (KPM 可打补丁版本)
+        run: |
+          git clone --depth=1 https://github.com/WildPlusKernel/AnyKernel3.git ak3_template
+          rm -rf ak3_template/.git ak3_template/README.md
+          cp kernel_workspace/common/out/arch/arm64/boot/Image ak3_template/Image
+          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwpwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9U3VraVNVLVVsdHJhIGJ1aWx0aW4gT25lUGx1cyBBY2UgNiA2LjYuMTE4IFNVU0ZTK0tQTSAoS1BNIHBhdGNoIHJlYWR5KQpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cD0xCmRvLmNsZWFudXBvbmFib3J0PTEKZGV2aWNlLm5hbWUxPQpkZXZpY2UubmFtZTI9CmRldmljZS5uYW1lMz0KZGV2aWNlLm5hbWU0PQpkZXZpY2UubmFtZTU9CnN1cHBvcnRlZC52ZXJzaW9ucz0Kc3VwcG9ydGVkLnBhdGNobGV2ZWxzPQpzdXBwb3J0ZWQudmVuZG9ycGF0Y2hsZXZlbHM9Cic7IH0KCmJsb2NrPWJvb3QKaXNfc2xvdF9kZXZpY2U9YXV0bwpyYW1kaXNrX2NvbXByZXNzaW9uPWF1dG8KcGF0Y2hfdmJtZXRhX2ZsYWc9YXV0bwpub19tYWdpc2tfY2hlY2s9MQoKLiB0b29scy9hazMtY29yZS5zaAoKc3BsaXRfYm9vdAppZiBbIC1mICJzcGxpdF9pbWcvcmFtZGlzay5jcGlvIiBdOyB0aGVuCiAgICB1bnBhY2tfcmFtZGlzawogICAgd3JpdGVfYm9vdAplbHNlCiAgICBmbGFzaF9ib290CmZpCg==" | base64 -d > ak3_template/anykernel.sh
+          mkdir -p ./AnyKernel3_plain
+          cp -r ak3_template/* ./AnyKernel3_plain/
+          ls -la ./AnyKernel3_plain/
+
+      - name: 📤 Upload plain AnyKernel3 (KPM 版)
+        uses: actions/upload-artifact@v6
+        with:
+          name: AK3_${{ env.KSUVER }}_${{ env.DEVICES_NAME }}_SukiSUUltra_plain_KPM
+          path: ./AnyKernel3_plain/*
+
   upload_rekernel:
     name: Upload Re-Kernel Module
     if: ${{ github.event.inputs.enable_ReKernel == 'true' }}
